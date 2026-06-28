@@ -1,59 +1,223 @@
-# Support Triage Agent
 
-A deterministic, terminal-based support triage pipeline for HackerRank Orchestrate. It parses 774 Markdown articles from the local support corpus, embeds them with `sentence-transformers`, classifies each ticket via pattern matching + safety heuristics, and writes `support_tickets/output.csv` plus append-only logs to `$HOME/hackerrank_orchestrate/log.txt`.
+# Orchestrate Triage Agent
 
-## Install
+A multi-domain **support ticket triage system** that classifies, retrieves relevant documentation, and determines the correct response or escalation path across **HackerRank**, **Claude (Anthropic)**, and **Visa** support scenarios.
 
-From the repository root:
+Built entirely with **local Retrieval-Augmented Generation (RAG)** using open-source models—**no API keys or paid LLMs required**.
+
+## Live Demo
+
+**Hugging Face Space:** https://huggingface.co/spaces/nishtha711/orchestrate-triage-agent
+
+---
+
+## Features
+
+- Multi-domain support ticket triage
+- Offline Retrieval-Augmented Generation (RAG)
+- No OpenAI or Anthropic API required
+- SentenceTransformer semantic search
+- Deterministic classification pipeline
+- Safety-aware escalation logic
+- Pattern-based decision overrides
+- Interactive Gradio interface
+- Session logging
+- Batch CSV processing support
+
+---
+
+# Pipeline
+
+```
+Support Ticket
+      │
+      ▼
+Classifier
+(keyword + regex heuristics)
+      │
+      ├── Request Type
+      │     • bug
+      │     • feature_request
+      │     • product_issue
+      │     • invalid
+      │
+      └── Safety Detection
+            • malicious requests
+            • sensitive information
+            • escalation triggers
+      │
+      ▼
+Retriever
+SentenceTransformers
+(all-MiniLM-L6-v2)
+Cosine Similarity Search
+      │
+      ▼
+Top Relevant Support Articles
+(HackerRank • Claude • Visa)
+      │
+      ▼
+Decision Engine
+      │
+      ├── Pattern Matching (30+ rules)
+      ├── Source-aware ranking
+      └── Escalate / Respond
+      │
+      ▼
+Structured Output
+
+• Status
+• Product Area
+• Response
+• Justification
+```
+
+---
+
+# Design Decisions
+
+### Local RAG
+
+Uses the lightweight **sentence-transformers/all-MiniLM-L6-v2** embedding model (~80 MB) for semantic retrieval.
+
+### Corpus Grounding
+
+Every generated response is grounded in an actual support article to minimize hallucinations.
+
+### Safety First
+
+Automatically escalates:
+
+- Identity theft
+- Malicious requests
+- Unauthorized workspace access
+- Sensitive account issues
+
+### Deterministic Pipeline
+
+No temperature sampling or stochastic generation, ensuring reproducible outputs.
+
+---
+
+# Project Structure
+
+```
+.
+├── app.py                      # Gradio UI
+├── requirements.txt
+├── LICENSE
+├── README.md
+├── problem_statement.md
+├── test_run.sh
+│
+├── code/
+│   ├── README.md
+│   ├── classifier.py
+│   ├── corpus.py
+│   ├── decision_engine.py
+│   ├── logger.py
+│   ├── main.py
+│   ├── requirements.txt
+│   └── retriever.py
+│
+└── support_tickets/
+    └── support_tickets/
+        ├── output.csv
+        ├── sample_support_tickets.csv
+        └── support_tickets.csv
+```
+
+---
+
+# Installation
+
+Clone the repository:
 
 ```bash
-cd code
+git clone https://github.com/711nishtha/orchestrate-triage-agent.git
+cd orchestrate-triage-agent
+```
+
+Install dependencies:
+
+```bash
 pip install -r requirements.txt
 ```
 
-No API keys are required. The only network dependency is the first-time download of the `all-MiniLM-L6-v2` sentence-transformer model (~80 MB).
+Run the application:
 
-## Run
+```bash
+python app.py
+```
 
-From the repository root:
+The first launch downloads the embedding model (`all-MiniLM-L6-v2`) and caches embeddings locally for faster subsequent runs.
+
+---
+
+# Batch CSV Processing
+
+To process support tickets from a CSV file:
 
 ```bash
 python code/main.py
 ```
 
-Or use the helper script:
-
-```bash
-bash test_run.sh
-```
-
-The script will:
-
-1. Discover the local `data/` and `support_tickets/` directories.
-2. Parse **Markdown** articles (with YAML frontmatter extraction) and ingest `sample_support_tickets.csv` as extra retrieval context.
-3. Build or reuse cached embeddings in `code/embeddings.npy` and `code/corpus_meta.pkl`.
-4. Process `support_tickets/support_tickets.csv`.
-5. Write `support_tickets/output.csv` with these exact columns:
-
-```text
-issue, subject, company, response, product_area, status, request_type, justification
-```
-
-## Architecture
+Predictions are saved to:
 
 ```
-main.py              → Pipeline orchestrator & CSV I/O
-corpus.py            → Markdown/HTML corpus loader with frontmatter parser
-retriever.py         → SentenceTransformer embedding + cosine similarity retrieval
-classifier.py        → Request type, product area, safety, & pattern matching
-decision_engine.py   → Integrates classifier + retriever → status & response
-logger.py            → Append-only logging to $HOME/hackerrank_orchestrate/log.txt
+support_tickets/output.csv
 ```
 
-## Key Design Decisions
+---
 
-- **Corpus-grounded responses**: Every reply is backed by an actual article from the local corpus. No hallucinated policies.
-- **Pattern matching overrides**: 30+ high-confidence patterns for known ticket types (account deletion, mock interviews, Visa lost card, etc.) bypass low-confidence retrieval.
-- **Safety-first escalation**: Identity theft, non-owner workspace access, and malicious requests (social engineering, system deletion) are always escalated.
-- **Source-aware re-ranking**: Retrieval results are boosted when they match the ticket's Company column.
-- **Deterministic**: No randomness, no temperature sampling, no external API calls.
+# Dataset & Support Corpus
+
+To keep the GitHub repository lightweight, the support corpus and dataset are **not included** in this repository.
+
+They are available in the Hugging Face Space used for the live demo:
+
+https://huggingface.co/spaces/nishtha711/orchestrate-triage-agent
+
+This includes:
+
+- Support knowledge base
+- Demo corpus
+- Sample support tickets
+- Batch processing data
+
+---
+
+# Tech Stack
+
+- Python
+- Gradio
+- Sentence Transformers
+- scikit-learn
+- NumPy
+- Regex
+- YAML
+- Cosine Similarity Search
+
+---
+
+# Supported Domains
+
+- HackerRank Support
+- Claude (Anthropic) Support
+- Visa Support
+
+---
+
+# Future Improvements
+
+- Hybrid BM25 + Dense Retrieval
+- LLM-powered response generation
+- Confidence scoring
+- Additional enterprise support domains
+- Feedback-driven continual learning
+
+---
+
+# License
+
+MIT License
